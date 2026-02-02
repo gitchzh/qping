@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 project(qping
-    VERSION 1.1.0
+    VERSION 1.0.1
     DESCRIPTION "Windows Ping 替代工具，支持高级扫描功能"
     LANGUAGES CXX
 )
@@ -46,6 +46,12 @@ if(MSVC)
     endif()
     target_compile_definitions(qping PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
+    # MinGW/GCC: 静态链接运行时库，避免依赖 libgcc_s_dw2-1.dll 等 DLL
+    target_link_options(qping PRIVATE -static-libgcc -static-libstdc++)
+    # 设置字符集：如果源代码是 UTF-8，使用 utf-8；如果是 GBK，使用 gbk
+    # 执行字符集统一使用 GBK，匹配中文 Windows 系统默认代码页 (936)
+    # 注意：如果源代码是 GBK 编码，将 -finput-charset=utf-8 改为 -finput-charset=gbk
+    target_compile_options(qping PRIVATE -finput-charset=utf-8 -fexec-charset=gbk)
     if(QPING_ENABLE_WARNINGS)
         target_compile_options(qping PRIVATE -Wall -Wextra -Wpedantic)
     endif()

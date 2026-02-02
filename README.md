@@ -63,7 +63,12 @@ qping --concurrency 200 192.168.1.0/24
 ### 使用 MinGW
 
 ```bash
-g++ -std=c++17 -O2 -I src src/main.cpp src/ping.cpp src/target.cpp -o qping.exe -lIphlpapi -lWs2_32
+# 静态链接运行时库，避免依赖 libgcc_s_dw2-1.dll 等 DLL
+# 如果源代码是 UTF-8 编码，使用：
+g++ -std=c++17 -O2 -I src -finput-charset=utf-8 -fexec-charset=gbk -static-libgcc -static-libstdc++ src/main.cpp src/ping.cpp src/target.cpp -o qping.exe -lIphlpapi -lWs2_32
+
+# 如果源代码是 GBK 编码，使用：
+g++ -std=c++17 -O2 -I src -finput-charset=gbk -fexec-charset=gbk -static-libgcc -static-libstdc++ src/main.cpp src/ping.cpp src/target.cpp -o qping.exe -lIphlpapi -lWs2_32
 ```
 
 ### 使用 MSVC
@@ -170,6 +175,14 @@ cmake --build . --config Release
 - 某些高级选项（如源路由）可能受网络设备限制
 
 ## 版本历史
+
+### v1.0.1
+
+- 修复在无环境变量的计算机中运行缺少 `libgcc_s_dw2-1.dll` 的问题（静态链接运行时库）
+- 修复中文系统中文显示乱码问题（设置控制台代码页为 GBK）
+- 优化首次运行速度（添加系统 API 预热机制）
+- 优化 DNS 解析性能（添加 2 秒超时机制，避免无网络环境下的长时间等待）
+- 修复头文件包含顺序问题（winsock2.h 必须在 windows.h 之前）
 
 ### v1.1.0
 

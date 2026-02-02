@@ -20,8 +20,10 @@
 #define _CRT_SECURE_NO_WARNINGS
 #define _WIN32_WINNT 0x0600
 
+// winsock2.h 必须在 windows.h 之前包含，避免冲突
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <windows.h>
 #include <iphlpapi.h>
 #include <icmpapi.h>
 #include <stdio.h>
@@ -36,6 +38,7 @@
 #include <mutex>
 #include <chrono>
 #include <algorithm>
+#include <exception>
 
 #ifndef _WIN32
 #error "本程序仅限Windows平台"
@@ -55,7 +58,7 @@ namespace qping {
 //=============================================================================
 
 /** @brief 程序版本号 */
-constexpr const char* VERSION = "1.1.0";
+constexpr const char* VERSION = "1.0.1";
 
 //=============================================================================
 // 默认参数常量

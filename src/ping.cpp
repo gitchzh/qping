@@ -413,68 +413,103 @@ PingResult ping_ipv6(const std::string& ip, const PingOptions& opts) {
 //=============================================================================
 
 /**
- * @brief 反向 DNS 解析，获取 IP 地址对应的主机名
+ * @brief 反向 DNS 解析，获取 IP 地址对应的主机名（带超时）
  *
  * 使用 getnameinfo API 执行反向 DNS 查询，将 IP 地址解析为主机名。
- * 此函数是线程安全的（与已弃用的 gethostbyaddr 不同）。
+ * 此函数是线程安全的，并包含超时机制以避免在无网络环境下的长时间等待。
  *
  * @param ip IP 地址字符串（IPv4 或 IPv6 格式）
  * @param af 地址族（AF_INET 或 AF_INET6）
- * @return 解析到的主机名；如果解析失败返回空字符串
+ * @return 解析到的主机名；如果解析失败或超时返回空字符串
  *
- * @note 反向 DNS 解析可能较慢，取决于 DNS 服务器响应时间
+ * @note 使用线程+超时机制，避免在无网络环境下等待过久（默认超时 2 秒）
  *
  * @example
  * @code
  * std::string hostname = resolve_hostname("8.8.8.8", AF_INET);
- * // 可能返回 "dns.google"
- *
- * std::string hostname6 = resolve_hostname("2001:4860:4860::8888", AF_INET6);
- * // 可能返回 "dns.google"
+ * // 可能返回 "dns.google" 或空字符串（如果超时或失败）
  * @endcode
  */
 std::string resolve_hostname(const std::string& ip, int af) {
-    char hostname[NI_MAXHOST] = {};
+    const int DNS_TIMEOUT_MS = 2000;  // DNS 查询超时时间（2秒）
+    std::string result;
+    std::atomic<bool> done{false};
+    std::exception_ptr exception_ptr = nullptr;
 
-    if (af == AF_INET) {
-        // IPv4 地址解析
-        sockaddr_in sa = {};
-        sa.sin_family = AF_INET;
-        InetPtonA(AF_INET, ip.c_str(), &sa.sin_addr);
+    // 在单独线程中执行 DNS 查询，以便实现超时
+    std::thread resolver([&]() {
+        try {
+            char hostname[NI_MAXHOST] = {};
 
-        if (getnameinfo(
-                (sockaddr*)&sa,
-                sizeof(sa),
-                hostname,
-                sizeof(hostname),
-                nullptr,        // 不需要服务名
-                0,
-                NI_NAMEREQD     // 要求返回主机名（否则返回错误）
-            ) == 0) {
-            return hostname;
+            if (af == AF_INET) {
+                // IPv4 地址解析
+                sockaddr_in sa = {};
+                sa.sin_family = AF_INET;
+                InetPtonA(AF_INET, ip.c_str(), &sa.sin_addr);
+
+                if (getnameinfo(
+                        (sockaddr*)&sa,
+                        sizeof(sa),
+                        hostname,
+                        sizeof(hostname),
+                        nullptr,        // 不需要服务名
+                        0,
+                        NI_NAMEREQD     // 要求返回主机名（否则返回错误）
+                    ) == 0) {
+                    result = hostname;
+                }
+            }
+            else if (af == AF_INET6) {
+                // IPv6 地址解析
+                sockaddr_in6 sa = {};
+                sa.sin6_family = AF_INET6;
+                InetPtonA(AF_INET6, ip.c_str(), &sa.sin6_addr);
+
+                if (getnameinfo(
+                        (sockaddr*)&sa,
+                        sizeof(sa),
+                        hostname,
+                        sizeof(hostname),
+                        nullptr,
+                        0,
+                        NI_NAMEREQD
+                    ) == 0) {
+                    result = hostname;
+                }
+            }
+        } catch (...) {
+            exception_ptr = std::current_exception();
+        }
+        done.store(true);
+    });
+
+    // 等待完成或超时
+    auto start = std::chrono::steady_clock::now();
+    while (!done.load()) {
+        auto elapsed = std::chrono::steady_clock::now() - start;
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() >= DNS_TIMEOUT_MS) {
+            // 超时，分离线程（让它继续运行但不等待结果）
+            resolver.detach();
+            return "";  // 超时返回空字符串
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    // 等待线程完成
+    if (resolver.joinable()) {
+        resolver.join();
+    }
+
+    // 检查是否有异常
+    if (exception_ptr) {
+        try {
+            std::rethrow_exception(exception_ptr);
+        } catch (...) {
+            // 忽略异常，返回空字符串
         }
     }
-    else if (af == AF_INET6) {
-        // IPv6 地址解析
-        sockaddr_in6 sa = {};
-        sa.sin6_family = AF_INET6;
-        InetPtonA(AF_INET6, ip.c_str(), &sa.sin6_addr);
 
-        if (getnameinfo(
-                (sockaddr*)&sa,
-                sizeof(sa),
-                hostname,
-                sizeof(hostname),
-                nullptr,
-                0,
-                NI_NAMEREQD
-            ) == 0) {
-            return hostname;
-        }
-    }
-
-    // 解析失败，返回空字符串
-    return "";
+    return result;
 }
 
 } // namespace qping
