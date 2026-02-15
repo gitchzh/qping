@@ -2,7 +2,7 @@
  * @file qping.h
  * @brief qping 公共头文件 - 常量定义、数据结构和函数声明
  * @author mrchzh <gmrchzh@gmail.com>
- * @version 1.1.0
+ * @version 1.2.0
  * @date 2026
  * @copyright MIT License
  *
@@ -58,7 +58,7 @@ namespace qping {
 //=============================================================================
 
 /** @brief 程序版本号 */
-constexpr const char* VERSION = "1.0.1";
+constexpr const char* VERSION = "1.2.0";
 
 //=============================================================================
 // 默认参数常量
@@ -340,6 +340,29 @@ PingResult ping_ipv6(const std::string& ip, const PingOptions& opts);
  */
 std::string resolve_hostname(const std::string& ip, int af);
 
+/**
+ * @brief 正向 DNS 解析，将主机名解析为单个 IP 地址
+ * @param hostname 主机名字符串
+ * @param prefer_ipv6 是否优先返回 IPv6 地址
+ * @return 解析后的 IP 地址字符串，解析失败返回空字符串
+ */
+std::string resolve_to_ip(const std::string& hostname, bool prefer_ipv6 = false);
+
+/**
+ * @brief 正向 DNS 解析，将主机名解析为多个 IP 地址
+ * @param hostname 主机名字符串
+ * @param prefer_ipv6 是否优先返回 IPv6 地址
+ * @return 解析后的 IP 地址列表，解析失败返回空列表
+ */
+std::vector<std::string> resolve_to_ips(const std::string& hostname, bool prefer_ipv6 = false);
+
+/**
+ * @brief 检查字符串是否为可能的主机名（不是 IP 地址）
+ * @param s 要检查的字符串
+ * @return 如果是可能的主机名返回 true，否则返回 false
+ */
+bool is_possible_hostname(const std::string& s);
+
 //=============================================================================
 // 帮助函数声明
 //=============================================================================
@@ -354,6 +377,47 @@ void print_version();
  * @param prog 程序名称（通常为 argv[0]）
  */
 void print_usage(const char* prog);
+
+//=============================================================================
+// 环境变量自动配置函数
+//=============================================================================
+
+/**
+ * @brief 获取当前可执行文件的完整路径
+ * @return 可执行文件的完整路径，失败返回空字符串
+ */
+std::string get_executable_path();
+
+/**
+ * @brief 获取可执行文件所在的目录路径
+ * @return 可执行文件所在目录的完整路径，失败返回空字符串
+ */
+std::string get_executable_directory();
+
+/**
+ * @brief 检查指定路径是否已在系统 PATH 环境变量中
+ * @param path 要检查的路径
+ * @return 如果路径已在 PATH 中返回 true，否则返回 false
+ */
+bool is_path_in_environment(const std::string& path);
+
+/**
+ * @brief 将指定路径添加到系统 PATH 环境变量
+ * @param path 要添加的路径
+ * @return 成功返回 true，失败返回 false
+ * 
+ * @note 此函数需要管理员权限
+ */
+bool add_path_to_environment(const std::string& path);
+
+/**
+ * @brief 自动将当前可执行文件目录添加到系统 PATH 环境变量
+ * @return 成功返回 true，失败或已存在返回 false
+ * 
+ * @note 此函数会自动检测是否已在 PATH 中，如果不在则尝试添加
+ *       需要管理员权限才能成功添加
+ */
+bool auto_add_to_path();
 
 } // namespace qping
 

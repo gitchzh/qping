@@ -55,6 +55,7 @@ void print_usage(const char* prog) {
 
     printf("\n目标格式:\n");
     printf("  192.168.0.1                    单个IP地址\n");
+    printf("  google.com                     域名（自动DNS解析）\n");
     printf("  192.168.1.1/24                 CIDR表示法\n");
     printf("  192.168.1.1-10                 最后一段范围 (a.b.c.d-e)\n");
     printf("  192.168.1-6                    第三段范围，第四段枚举 1..254\n");
@@ -84,12 +85,188 @@ void print_usage(const char* prog) {
     printf("  -h, --help                     显示此帮助信息\n");
     printf("  --version                      显示版本信息\n");
 
+    printf("\n域名解析:\n");
+    printf("  - 支持ping域名（如 google.com），自动进行DNS解析\n");
+    printf("  - 使用 -4 强制解析为IPv4地址\n");
+    printf("  - 使用 -6 强制解析为IPv6地址\n");
+
     printf("\n示例:\n");
     printf("  %s 192.168.0.1\n", prog);
     printf("  %s -t 192.168.0.1\n", prog);
     printf("  %s -n 5 -l 64 192.168.0.1\n", prog);
     printf("  %s 192.168.1.1/24\n", prog);
     printf("  %s --concurrency 200 192.168.1.1/24\n", prog);
+}
+
+//=============================================================================
+// 环境变量自动配置函数实现
+//=============================================================================
+
+/**
+ * @brief 获取当前可执行文件的完整路径
+ */
+std::string get_executable_path() {
+    char buffer[MAX_PATH];
+    DWORD length = GetModuleFileNameA(NULL, buffer, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH) {
+        return "";
+    }
+    return std::string(buffer);
+}
+
+/**
+ * @brief 获取可执行文件所在的目录路径
+ */
+std::string get_executable_directory() {
+    std::string exe_path = get_executable_path();
+    if (exe_path.empty()) {
+        return "";
+    }
+    
+    size_t last_slash = exe_path.find_last_of("\\/");
+    if (last_slash == std::string::npos) {
+        return "";
+    }
+    
+    return exe_path.substr(0, last_slash);
+}
+
+/**
+ * @brief 检查指定路径是否已在系统 PATH 环境变量中
+ */
+bool is_path_in_environment(const std::string& path) {
+    DWORD size = GetEnvironmentVariableA("PATH", NULL, 0);
+    if (size == 0) {
+        return false;
+    }
+    
+    std::vector<char> buffer(size);
+    GetEnvironmentVariableA("PATH", buffer.data(), size);
+    
+    std::string current_path(buffer.data());
+    
+    std::vector<std::string> paths = split(current_path, ';');
+    for (const auto& p : paths) {
+        if (_stricmp(p.c_str(), path.c_str()) == 0) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * @brief 将指定路径添加到系统 PATH 环境变量
+ */
+bool add_path_to_environment(const std::string& path) {
+    DWORD size = GetEnvironmentVariableA("PATH", NULL, 0);
+    if (size == 0) {
+        return false;
+    }
+    
+    std::vector<char> buffer(size);
+    GetEnvironmentVariableA("PATH", buffer.data(), size);
+    
+    std::string current_path(buffer.data());
+    
+    std::string new_path = current_path + ";" + path;
+    
+    HKEY hKey;
+    LONG result = RegOpenKeyExA(
+        HKEY_LOCAL_MACHINE,
+        "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
+        0,
+        KEY_WRITE,
+        &hKey
+    );
+    
+    if (result != ERROR_SUCCESS) {
+        return false;
+    }
+    
+    result = RegSetValueExA(
+        hKey,
+        "Path",
+        0,
+        REG_EXPAND_SZ,
+        (const BYTE*)new_path.c_str(),
+        (DWORD)new_path.size() + 1
+    );
+    
+    RegCloseKey(hKey);
+    
+    if (result == ERROR_SUCCESS) {
+        DWORD_PTR result;
+        SendMessageTimeoutA(
+            HWND_BROADCAST,
+            WM_SETTINGCHANGE,
+            0,
+            (LPARAM)"Environment",
+            SMTO_ABORTIFHUNG,
+            5000,
+            &result
+        );
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * @brief 自动将当前可执行文件目录添加到系统 PATH 环境变量
+ */
+bool auto_add_to_path() {
+    std::string exe_dir = get_executable_directory();
+    if (exe_dir.empty()) {
+        return false;
+    }
+    
+    if (is_path_in_environment(exe_dir)) {
+        return false;
+    }
+    
+    HANDLE hToken = NULL;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
+        return false;
+    }
+    
+    SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
+    PSID AdministratorsGroup;
+    BOOL isAdmin = AllocateAndInitializeSid(
+        &NtAuthority,
+        2,
+        SECURITY_BUILTIN_DOMAIN_RID,
+        DOMAIN_ALIAS_RID_ADMINS,
+        0, 0, 0, 0, 0, 0,
+        &AdministratorsGroup
+    );
+    
+    if (isAdmin) {
+        if (!CheckTokenMembership(NULL, AdministratorsGroup, &isAdmin)) {
+            isAdmin = FALSE;
+        }
+        FreeSid(AdministratorsGroup);
+    }
+    
+    CloseHandle(hToken);
+    
+    if (!isAdmin) {
+        return false;
+    }
+    
+    printf("检测到 qping 未在系统 PATH 中，正在自动添加...\n");
+    printf("安装路径: %s\n", exe_dir.c_str());
+    
+    if (add_path_to_environment(exe_dir)) {
+        printf("已成功添加到系统 PATH 环境变量！\n");
+        printf("请关闭并重新打开命令行窗口以使更改生效。\n");
+        printf("\n");
+        return true;
+    } else {
+        printf("添加失败，请手动添加到环境变量。\n");
+        printf("\n");
+        return false;
+    }
 }
 
 } // namespace qping
@@ -216,6 +393,14 @@ int main(int argc, char** argv) {
     // 这是最可靠的方法，因为程序内部使用 GBK 编码（通过 -fexec-charset=gbk）
     SetConsoleOutputCP(936);  // GBK
     SetConsoleCP(936);         // GBK
+
+    //=========================================================================
+    // 自动添加到系统 PATH 环境变量
+    //=========================================================================
+    // 检测当前可执行文件目录是否已在系统 PATH 中
+    // 如果不在且具有管理员权限，则自动添加
+    // 这样用户只需双击运行即可完成安装
+    bool auto_added = auto_add_to_path();
 
     //=========================================================================
     // 参数检查（快速路径，避免不必要的预热）
@@ -436,24 +621,52 @@ int main(int argc, char** argv) {
 
         //---------------------------------------------------------------------
         // 目标参数处理
-        // 支持两种逗号用法：
-        // 1. 多个独立目标：192.168.1.1,192.168.2.1（每部分都是完整IP）
+        // 支持三种逗号用法：
+        // 1. 多个独立目标：192.168.1.1,192.168.2.1（每部分都是完整IP或域名）
         // 2. 最后一段列表：192.168.2.1,3,5（只有第一部分是完整IP）
+        // 3. 多个域名：google.com,localhost,yahoo.com（每个都是域名）
         //---------------------------------------------------------------------
         if (arg.find(',') != std::string::npos) {
             auto parts = split(arg, ',');
-            // 检查是否所有部分都是完整的 IP 格式（包含点号）
-            bool all_complete_ips = true;
+            // 检查是否所有部分都是完整的 IP 格式（包含点号）或域名
+            bool all_complete_targets = true;
             for (const auto& p : parts) {
-                // 完整 IP 应该包含点号（IPv4）或冒号（IPv6）
+                // 完整目标应该是：IP地址（包含点号或冒号）或域名
                 if (!p.empty() && p.find('.') == std::string::npos &&
                     p.find(':') == std::string::npos) {
-                    all_complete_ips = false;
-                    break;
+                    // 可能是数字（如最后一段列表）或域名
+                    // 检查是否是纯数字（最后一段列表格式）
+                    bool is_number = true;
+                    for (char c : p) {
+                        if (c < '0' || c > '9') {
+                            is_number = false;
+                            break;
+                        }
+                    }
+                    if (is_number) {
+                        // 纯数字，可能是最后一段列表格式的一部分
+                        all_complete_targets = false;
+                        break;
+                    } else {
+                        // 不是纯数字，可能是域名
+                        // 检查是否包含字母，可能是域名
+                        bool has_letter = false;
+                        for (char c : p) {
+                            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+                                has_letter = true;
+                                break;
+                            }
+                        }
+                        if (!has_letter) {
+                            // 既不是数字也不是字母，无效格式
+                            all_complete_targets = false;
+                            break;
+                        }
+                    }
                 }
             }
 
-            if (all_complete_ips) {
+            if (all_complete_targets) {
                 // 多个独立目标，分别添加
                 for (auto& p : parts) {
                     if (!p.empty()) {
@@ -488,19 +701,65 @@ int main(int argc, char** argv) {
     }
 
     //=========================================================================
-    // 枚举所有目标 IP 地址
+    // 枚举所有目标 IP 地址（支持域名解析）
     //=========================================================================
     std::vector<std::string> all_targets;
     for (auto& tok : tokens) {
-        std::vector<std::string> gen;
-        if (!enumerate_targets(tok, gen, force ? UINT_MAX : MAX_HOSTS_DEFAULT)) {
-            WSACleanup();
-            return 2;
-        }
-        // 添加不在排除列表中的目标
-        for (auto& ip : gen) {
-            if (exclude_set.find(ip) == exclude_set.end()) {
-                all_targets.push_back(ip);
+        // 检查是否是可能的主机名（域名）
+        if (is_possible_hostname(tok)) {
+            // 解析域名为IP地址
+            std::vector<std::string> resolved_ips;
+            if (force_ipv6) {
+                // 只解析IPv6地址
+                resolved_ips = resolve_to_ips(tok, true);
+                // 过滤掉IPv4地址（如果有）
+                std::vector<std::string> ipv6_only;
+                for (const auto& ip : resolved_ips) {
+                    if (ip.find(':') != std::string::npos) {
+                        ipv6_only.push_back(ip);
+                    }
+                }
+                resolved_ips = ipv6_only;
+            } else if (force_ipv4) {
+                // 只解析IPv4地址
+                resolved_ips = resolve_to_ips(tok, false);
+                // 过滤掉IPv6地址（如果有）
+                std::vector<std::string> ipv4_only;
+                for (const auto& ip : resolved_ips) {
+                    if (ip.find(':') == std::string::npos) {
+                        ipv4_only.push_back(ip);
+                    }
+                }
+                resolved_ips = ipv4_only;
+            } else {
+                // 解析所有地址
+                resolved_ips = resolve_to_ips(tok, false);
+            }
+            
+            if (resolved_ips.empty()) {
+                fprintf(stderr, "无法解析域名: %s\n", tok.c_str());
+                WSACleanup();
+                return 2;
+            }
+            
+            // 添加解析到的IP地址
+            for (auto& ip : resolved_ips) {
+                if (exclude_set.find(ip) == exclude_set.end()) {
+                    all_targets.push_back(ip);
+                }
+            }
+        } else {
+            // 不是域名，使用原来的IP/CIDR/范围解析逻辑
+            std::vector<std::string> gen;
+            if (!enumerate_targets(tok, gen, force ? UINT_MAX : MAX_HOSTS_DEFAULT)) {
+                WSACleanup();
+                return 2;
+            }
+            // 添加不在排除列表中的目标
+            for (auto& ip : gen) {
+                if (exclude_set.find(ip) == exclude_set.end()) {
+                    all_targets.push_back(ip);
+                }
             }
         }
     }

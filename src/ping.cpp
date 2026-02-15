@@ -512,4 +512,292 @@ std::string resolve_hostname(const std::string& ip, int af) {
     return result;
 }
 
+/**
+ * @brief 正向 DNS 解析，将主机名解析为单个 IP 地址
+ *
+ * 使用 Windows getaddrinfo API 将主机名解析为 IP 地址。
+ * 如果主机名解析为多个 IP 地址，返回第一个符合条件的地址。
+ * 支持 IPv4 和 IPv6 地址，根据 prefer_ipv6 参数决定优先级。
+ *
+ * @param hostname 主机名字符串
+ * @param prefer_ipv6 是否优先返回 IPv6 地址
+ * @return 解析后的 IP 地址字符串，解析失败返回空字符串
+ *
+ * @example
+ * @code
+ * std::string ip = resolve_to_ip("google.com");
+ * // 可能返回 "142.250.190.78"
+ * @endcode
+ */
+std::string resolve_to_ip(const std::string& hostname, bool prefer_ipv6) {
+    addrinfo hints = {};
+    addrinfo* result = nullptr;
+    std::string resolved_ip;
+    
+    // 设置提示信息
+    hints.ai_family = prefer_ipv6 ? AF_INET6 : AF_UNSPEC;  // 指定地址族
+    hints.ai_socktype = SOCK_STREAM;                       // 流式套接字（TCP）
+    hints.ai_protocol = IPPROTO_TCP;                       // TCP协议
+    hints.ai_flags = AI_CANONNAME;                         // 返回规范名称
+    
+    // 执行 DNS 查询
+    int status = getaddrinfo(hostname.c_str(), nullptr, &hints, &result);
+    if (status != 0 || result == nullptr) {
+        // 解析失败
+        return "";
+    }
+    
+    // 遍历结果列表，选择第一个合适的地址
+    for (addrinfo* ptr = result; ptr != nullptr; ptr = ptr->ai_next) {
+        char ip_str[INET6_ADDRSTRLEN] = {};
+        
+        if (ptr->ai_family == AF_INET) {
+            // IPv4 地址
+            sockaddr_in* ipv4 = reinterpret_cast<sockaddr_in*>(ptr->ai_addr);
+            InetNtopA(AF_INET, &(ipv4->sin_addr), ip_str, sizeof(ip_str));
+        } else if (ptr->ai_family == AF_INET6) {
+            // IPv6 地址
+            sockaddr_in6* ipv6 = reinterpret_cast<sockaddr_in6*>(ptr->ai_addr);
+            InetNtopA(AF_INET6, &(ipv6->sin6_addr), ip_str, sizeof(ip_str));
+        } else {
+            // 不支持的其他地址族
+            continue;
+        }
+        
+        // 找到第一个有效的 IP 地址
+        if (ip_str[0] != '\0') {
+            resolved_ip = ip_str;
+            break;
+        }
+    }
+    
+    // 释放 addrinfo 结构
+    if (result != nullptr) {
+        freeaddrinfo(result);
+    }
+    
+    return resolved_ip;
+}
+
+/**
+ * @brief 正向 DNS 解析，将主机名解析为多个 IP 地址
+ *
+ * 使用 Windows getaddrinfo API 将主机名解析为所有可用的 IP 地址。
+ * 返回所有解析到的 IPv4 和 IPv6 地址。
+ *
+ * @param hostname 主机名字符串
+ * @param prefer_ipv6 是否优先处理 IPv6 地址
+ * @return 解析后的 IP 地址列表，解析失败返回空列表
+ *
+ * @example
+ * @code
+ * auto ips = resolve_to_ips("google.com");
+ * // 可能返回 {"142.250.190.78", "2a00:1450:4001:82d::200e"}
+ * @endcode
+ */
+std::vector<std::string> resolve_to_ips(const std::string& hostname, bool prefer_ipv6) {
+    addrinfo hints = {};
+    addrinfo* result = nullptr;
+    std::vector<std::string> resolved_ips;
+    
+    // 设置提示信息
+    hints.ai_family = AF_UNSPEC;                           // 接受 IPv4 和 IPv6
+    hints.ai_socktype = SOCK_STREAM;                       // 流式套接字（TCP）
+    hints.ai_protocol = IPPROTO_TCP;                       // TCP协议
+    hints.ai_flags = AI_CANONNAME;                         // 返回规范名称
+    
+    // 执行 DNS 查询
+    int status = getaddrinfo(hostname.c_str(), nullptr, &hints, &result);
+    if (status != 0 || result == nullptr) {
+        // 解析失败
+        return resolved_ips;
+    }
+    
+    // 遍历结果列表，收集所有 IP 地址
+    for (addrinfo* ptr = result; ptr != nullptr; ptr = ptr->ai_next) {
+        char ip_str[INET6_ADDRSTRLEN] = {};
+        
+        if (ptr->ai_family == AF_INET) {
+            // IPv4 地址
+            sockaddr_in* ipv4 = reinterpret_cast<sockaddr_in*>(ptr->ai_addr);
+            InetNtopA(AF_INET, &(ipv4->sin_addr), ip_str, sizeof(ip_str));
+        } else if (ptr->ai_family == AF_INET6) {
+            // IPv6 地址
+            sockaddr_in6* ipv6 = reinterpret_cast<sockaddr_in6*>(ptr->ai_addr);
+            InetNtopA(AF_INET6, &(ipv6->sin6_addr), ip_str, sizeof(ip_str));
+        } else {
+            // 不支持的其他地址族
+            continue;
+        }
+        
+        // 添加有效的 IP 地址到列表
+        if (ip_str[0] != '\0') {
+            resolved_ips.push_back(ip_str);
+        }
+    }
+    
+    // 释放 addrinfo 结构
+    if (result != nullptr) {
+        freeaddrinfo(result);
+    }
+    
+    // 如果指定了优先级，重新排序
+    if (prefer_ipv6) {
+        std::vector<std::string> sorted_ips;
+        // 先添加 IPv6 地址
+        for (const auto& ip : resolved_ips) {
+            if (ip.find(':') != std::string::npos) {
+                sorted_ips.push_back(ip);
+            }
+        }
+        // 然后添加 IPv4 地址
+        for (const auto& ip : resolved_ips) {
+            if (ip.find(':') == std::string::npos) {
+                sorted_ips.push_back(ip);
+            }
+        }
+        return sorted_ips;
+    }
+    
+    return resolved_ips;
+}
+
+/**
+ * @brief 检查字符串是否为可能的主机名（不是 IP 地址）
+ *
+ * 启发式方法判断字符串是否可能为主机名而不是 IP 地址：
+ * 1. 首先检查是否为有效的 IPv6 地址（包含冒号）
+ * 2. 然后检查是否为有效的 IPv4 地址（包含点号）
+ * 3. 如果不是有效的 IP 地址，检查是否可能是域名：
+ *    - 包含字母（如 google.com）
+ *    - 包含连字符（如 example-site.com）
+ *    - 包含多个点号但不是有效的 IP 地址（如 sub.domain.com）
+ *    - 常见域名后缀（如 .com, .net, .org 等）
+ *
+ * @param s 要检查的字符串
+ * @return 如果是可能的主机名返回 true，否则返回 false
+ *
+ * @example
+ * @code
+ * is_possible_hostname("google.com");    // true
+ * is_possible_hostname("192.168.1.1");   // false
+ * is_possible_hostname("2001:db8::1");   // false
+ * is_possible_hostname("localhost");     // true
+ * is_possible_hostname("example-site.com"); // true
+ * @endcode
+ */
+bool is_possible_hostname(const std::string& s) {
+    // 空字符串不是主机名
+    if (s.empty()) {
+        return false;
+    }
+    
+    //-------------------------------------------------------------------------
+    // 检查是否包含逗号（IP范围分隔符，不是主机名特征）
+    //-------------------------------------------------------------------------
+    if (s.find(',') != std::string::npos) {
+        return false;  // 包含逗号，可能是IP范围格式
+    }
+    
+    //-------------------------------------------------------------------------
+    // 检查是否包含斜杠（CIDR格式分隔符，不是主机名特征）
+    //-------------------------------------------------------------------------
+    if (s.find('/') != std::string::npos) {
+        return false;  // 包含斜杠，可能是CIDR格式
+    }
+    
+    //-------------------------------------------------------------------------
+    // 检查是否为有效的 IPv6 地址
+    //-------------------------------------------------------------------------
+    if (s.find(':') != std::string::npos) {
+        in6_addr addr;
+        if (InetPtonA(AF_INET6, s.c_str(), &addr) == 1) {
+            return false;  // 是有效的 IPv6 地址
+        }
+        // 无效的 IPv6 格式，可能是主机名或格式错误的地址
+    }
+    
+    //-------------------------------------------------------------------------
+    // 检查是否为有效的 IPv4 地址
+    //-------------------------------------------------------------------------
+    if (s.find('.') != std::string::npos) {
+        in_addr addr;
+        if (InetPtonA(AF_INET, s.c_str(), &addr) == 1) {
+            return false;  // 是有效的 IPv4 地址
+        }
+        // 无效的 IPv4 格式，可能是主机名
+    }
+    
+    //-------------------------------------------------------------------------
+    // 启发式判断是否为可能的主机名
+    //-------------------------------------------------------------------------
+    
+    // 1. 检查是否包含字母（主机名通常包含字母）
+    bool has_letter = false;
+    for (char c : s) {
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+            has_letter = true;
+            break;
+        }
+    }
+    if (has_letter) {
+        return true;
+    }
+    
+    // 2. 检查是否包含连字符（如 example-site.com）
+    if (s.find('-') != std::string::npos) {
+        // 检查是否是IP范围格式（如 192.168.2.1-6）
+        // IP范围格式特征：包含点号和连字符，没有字母
+        if (s.find('.') != std::string::npos) {
+            // 检查是否没有字母（IP范围通常只有数字、点和连字符）
+            bool has_letter = false;
+            for (char c : s) {
+                if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+                    has_letter = true;
+                    break;
+                }
+            }
+            if (!has_letter) {
+                // 可能是IP范围格式，不是主机名
+                return false;
+            }
+        }
+        // 否则可能是包含连字符的主机名（如 example-site.com）
+        return true;
+    }
+    
+    // 3. 检查是否包含多个点号（如 sub.domain.com）
+    size_t dot_count = 0;
+    for (char c : s) {
+        if (c == '.') {
+            dot_count++;
+        }
+    }
+    if (dot_count >= 2) {
+        return true;  // 多个点号通常是域名
+    }
+    
+    // 4. 检查常见域名后缀（即使没有字母）
+    static const std::vector<std::string> common_tlds = {
+        ".com", ".net", ".org", ".edu", ".gov", ".mil",
+        ".cn", ".uk", ".jp", ".de", ".fr", ".ru",
+        ".info", ".biz", ".name", ".mobi", ".io", ".ai"
+    };
+    
+    for (const auto& tld : common_tlds) {
+        if (s.size() >= tld.size() && 
+            s.compare(s.size() - tld.size(), tld.size(), tld) == 0) {
+            return true;
+        }
+    }
+    
+    // 5. 检查是否为 "localhost"（特殊域名，没有点号）
+    if (s == "localhost" || s == "LOCALHOST") {
+        return true;
+    }
+    
+    // 不符合任何主机名特征
+    return false;
+}
+
 } // namespace qping

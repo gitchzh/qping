@@ -1,10 +1,19 @@
 cmake_minimum_required(VERSION 3.15)
 
 project(qping
-    VERSION 1.0.1
+    VERSION 1.2.0
     DESCRIPTION "Windows Ping 替代工具，支持高级扫描功能"
     LANGUAGES CXX
 )
+
+# 设置 Windows 目标版本为 Windows Vista (0x0600)，兼容 Windows 7/8/10/11
+# 0x0600 = Windows Vista / Server 2008
+add_definitions(-D_WIN32_WINNT=0x0600)
+
+# MSVC 静态运行时库设置（必须在 project() 之后）
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 
 if(NOT WIN32)
     message(FATAL_ERROR "qping 仅支持 Windows 平台")
@@ -14,7 +23,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "构建类型" FORCE)
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -46,8 +55,8 @@ if(MSVC)
     endif()
     target_compile_definitions(qping PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
-    # MinGW/GCC: 静态链接运行时库，避免依赖 libgcc_s_dw2-1.dll 等 DLL
-    target_link_options(qping PRIVATE -static-libgcc -static-libstdc++)
+    # MinGW/GCC: 完全静态链接，避免依赖 libgcc_s_dw2-1.dll、libstdc++-6.dll、libwinpthread-1.dll 等
+    target_link_options(qping PRIVATE -static -static-libgcc -static-libstdc++)
     # 设置字符集：如果源代码是 UTF-8，使用 utf-8；如果是 GBK，使用 gbk
     # 执行字符集统一使用 GBK，匹配中文 Windows 系统默认代码页 (936)
     # 注意：如果源代码是 GBK 编码，将 -finput-charset=utf-8 改为 -finput-charset=gbk
@@ -71,3 +80,9 @@ include(CPack)
 
 message(STATUS "项目: ${PROJECT_NAME} v${PROJECT_VERSION}")
 message(STATUS "构建类型: ${CMAKE_BUILD_TYPE}")
+message(STATUS "Windows 目标版本: 0x0600 (Vista/Server 2008)")
+if(MSVC)
+    message(STATUS "MSVC 运行时库: 静态链接")
+else()
+    message(STATUS "MinGW 链接: 完全静态链接")
+endif()
