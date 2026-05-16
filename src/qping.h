@@ -34,6 +34,7 @@
 #include <vector>
 #include <string>
 #include <unordered_set>
+#include <unordered_map>
 #include <thread>
 #include <mutex>
 #include <chrono>
@@ -46,6 +47,31 @@
 
 #pragma comment(lib, "iphlpapi.lib")
 #pragma comment(lib, "ws2_32.lib")
+
+// 语言枚举
+enum class Language {
+    AUTO,    // 自动检测
+    CHINESE, // 中文
+    ENGLISH  // 英文
+};
+
+namespace qping {
+
+extern Language g_language;
+
+// 设置语言
+void set_language(Language lang);
+
+// 获取当前语言
+Language get_language();
+
+// 从注册表加载语言设置
+void load_language_from_registry();
+
+// 国际化文本函数
+const char* gettext(const char* zh, const char* en);
+
+}
 
 /**
  * @namespace qping
@@ -206,6 +232,37 @@ struct PingOptions {
 };
 
 //=============================================================================
+// 端口检测相关
+//=============================================================================
+
+/** @brief 默认端口检测超时时间（毫秒） */
+constexpr int DEFAULT_PORT_TIMEOUT_MS = 1000;
+
+/** @brief 最大并发 socket 连接数 */
+constexpr int MAX_CONCURRENT_SOCKETS = 200;
+
+/**
+ * @struct PortResult
+ * @brief 端口检测操作的结果数据结构
+ *
+ * 存储单次端口检测操作的结果信息，包括是否开放、
+ * 连接时间和常见服务名称。
+ */
+struct PortResult {
+    bool open = false;               ///< 端口是否开放
+    int port = 0;                    ///< 端口号
+    DWORD rtt_ms = 0;                ///< 连接响应时间（毫秒）
+    std::string service;              ///< 常见服务名称
+};
+
+/**
+ * @brief 常见端口对应的服务名称
+ * @param port 端口号
+ * @return 服务名称，未知返回空字符串
+ */
+std::string get_service_name(int port);
+
+//=============================================================================
 // 工具函数声明
 //=============================================================================
 
@@ -362,6 +419,49 @@ std::vector<std::string> resolve_to_ips(const std::string& hostname, bool prefer
  * @return 如果是可能的主机名返回 true，否则返回 false
  */
 bool is_possible_hostname(const std::string& s);
+
+//=============================================================================
+// 端口检测函数声明
+//=============================================================================
+
+/**
+ * @brief 执行 TCP 端口检测
+ * @param ip 目标 IP 地址
+ * @param port 端口号
+ * @param timeout_ms 超时时间（毫秒）
+ * @return 端口检测结果
+ */
+PortResult scan_tcp_port(const std::string& ip, int port, int timeout_ms);
+
+/**
+ * @brief 检查目标字符串是否包含端口（格式：IP:PORT）
+ * @param target 目标字符串
+ * @return 如果包含端口返回 true，否则返回 false
+ */
+bool has_port(const std::string& target);
+
+/**
+ * @brief 从目标字符串中分离 IP 和端口
+ * @param target 目标字符串（格式：IP:PORT）
+ * @param[out] ip 输出 IP 地址部分
+ * @param[out] port 输出端口号，-1 表示无端口
+ */
+void split_host_port(const std::string& target, std::string& ip, int& port);
+
+/**
+ * @brief 检查字符串是否为有效的端口格式
+ * @param s 要检查的字符串（如 "80" 或 "80-443"）
+ * @return 如果是有效的端口格式返回 true
+ */
+bool is_valid_port_format(const std::string& s);
+
+/**
+ * @brief 解析端口范围字符串
+ * @param port_str 端口字符串（如 "80"、"80-443"、"80,443,8080"）
+ * @param[out] ports 输出的端口列表
+ * @return 解析成功返回 true，失败返回 false
+ */
+bool parse_port_range(const std::string& port_str, std::vector<int>& ports);
 
 //=============================================================================
 // 帮助函数声明

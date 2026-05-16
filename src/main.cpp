@@ -34,9 +34,9 @@ namespace qping {
  * 输出程序名称、版本号、简要描述和作者信息。
  */
 void print_version() {
-    printf("qping 版本 %s\n", VERSION);
-    printf("Windows Ping 替代工具，支持高级扫描功能\n");
-    printf("作者: mrchzh <gmrchzh@gmail.com>\n");
+    printf(qping::gettext("qping 版本 %s\n", "qping version %s\n"), VERSION);
+    printf(qping::gettext("Windows Ping 替代工具，支持高级扫描功能\n", "Windows Ping alternative with advanced scanning features\n"));
+    printf(qping::gettext("作者: mrchzh <gmrchzh@gmail.com>\n", "Author: mrchzh <gmrchzh@gmail.com>\n"));
 }
 
 /**
@@ -51,51 +51,67 @@ void print_version() {
  * @param prog 程序名称（通常为 argv[0]）
  */
 void print_usage(const char* prog) {
-    printf("用法: %s [选项] 目标1 [目标2 ...]\n", prog);
+    printf(qping::gettext("用法: %s [选项] 目标1 [目标2 ...]\n", "Usage: %s [options] target1 [target2 ...]\n"), prog);
 
-    printf("\n目标格式:\n");
-    printf("  192.168.0.1                    单个IP地址\n");
-    printf("  google.com                     域名（自动DNS解析）\n");
-    printf("  192.168.1.1/24                 CIDR表示法\n");
-    printf("  192.168.1.1-10                 最后一段范围 (a.b.c.d-e)\n");
-    printf("  192.168.1-6                    第三段范围，第四段枚举 1..254\n");
-    printf("  2001:db8::1                    IPv6地址\n");
+    printf("\n");
+    printf(qping::gettext("目标格式:\n", "Target formats:\n"));
+    printf(qping::gettext("  192.168.0.1                    单个IP地址\n", "  192.168.0.1                    Single IP address\n"));
+    printf(qping::gettext("  google.com                     域名（自动DNS解析）\n", "  google.com                     Domain name (auto DNS resolution)\n"));
+    printf(qping::gettext("  192.168.1.1/24                 CIDR表示法\n", "  192.168.1.1/24                 CIDR notation\n"));
+    printf(qping::gettext("  192.168.1.1-10                 最后一段范围\n", "  192.168.1.1-10                 Last octet range\n"));
+    printf(qping::gettext("  192.168.1-6                    第三段范围，枚举1..254\n", "  192.168.1-6                    Third octet range, enumerate 1..254\n"));
+    printf(qping::gettext("  2001:db8::1                    IPv6地址\n", "  2001:db8::1                    IPv6 address\n"));
 
-    printf("\n标准ping选项:\n");
-    printf("  -t                             持续ping直到被停止\n");
-    printf("  -a                             解析地址为主机名\n");
-    printf("  -n count                       发送回显请求的次数\n");
-    printf("  -l size                        发送缓冲区大小(字节，最大%d)\n", MAX_PAYLOAD_SIZE);
-    printf("  -f                             设置不分段标志(仅IPv4)\n");
-    printf("  -i TTL                         生存时间\n");
-    printf("  -v TOS                         服务类型(仅IPv4)\n");
-    printf("  -r count                       记录路由跳数(1-%d，仅IPv4)\n", MAX_RECORD_ROUTE);
-    printf("  -s count                       时间戳跳数(1-%d，仅IPv4)\n", MAX_TIMESTAMP);
-    printf("  -j host-list                   宽松源路由(仅IPv4)\n");
-    printf("  -k host-list                   严格源路由(仅IPv4)\n");
-    printf("  -w timeout                     等待每次回复的超时时间(毫秒)\n");
-    printf("  -S srcaddr                     使用的源地址\n");
-    printf("  -4                             强制使用IPv4\n");
-    printf("  -6                             强制使用IPv6\n");
+    printf("\n");
+    printf(qping::gettext("标准ping选项:\n", "Standard ping options:\n"));
+    printf(qping::gettext("  -t                             持续ping直到被停止\n", "  -t                             Ping until stopped\n"));
+    printf(qping::gettext("  -a                             解析地址为主机名\n", "  -a                             Resolve addresses to hostnames\n"));
+    printf(qping::gettext("  -n count                       发送回显请求的次数\n", "  -n count                       Number of echo requests to send\n"));
+    printf(qping::gettext("  -l size                        发送缓冲区大小(字节)\n", "  -l size                        Send buffer size (bytes)\n"));
+    printf(qping::gettext("  -f                             设置不分段标志(仅IPv4)\n", "  -f                             Set Don't Fragment flag (IPv4 only)\n"));
+    printf(qping::gettext("  -i TTL                         生存时间\n", "  -i TTL                         Time To Live\n"));
+    printf(qping::gettext("  -v TOS                         服务类型(仅IPv4)\n", "  -v TOS                         Type of Service (IPv4 only)\n"));
+    printf(qping::gettext("  -r count                       记录路由跳数(仅IPv4)\n", "  -r count                       Record route hops (IPv4 only)\n"));
+    printf(qping::gettext("  -s count                       时间戳跳数(仅IPv4)\n", "  -s count                       Timestamp hops (IPv4 only)\n"));
+    printf(qping::gettext("  -j host-list                   宽松源路由(仅IPv4)\n", "  -j host-list                   Loose source route (IPv4 only)\n"));
+    printf(qping::gettext("  -k host-list                   严格源路由(仅IPv4)\n", "  -k host-list                   Strict source route (IPv4 only)\n"));
+    printf(qping::gettext("  -w timeout                     等待回复超时(毫秒)\n", "  -w timeout                     Timeout for each reply (ms)\n"));
+    printf(qping::gettext("  -S srcaddr                     使用的源地址\n", "  -S srcaddr                     Source address to use\n"));
+    printf(qping::gettext("  -4                             强制使用IPv4\n", "  -4                             Force IPv4\n"));
+    printf(qping::gettext("  -6                             强制使用IPv6\n", "  -6                             Force IPv6\n"));
 
-    printf("\n扩展选项:\n");
-    printf("  --concurrency N                并发线程数(默认 %d)\n", DEFAULT_CONCURRENCY);
-    printf("  --force                        允许扫描超过 %u 个目标\n", MAX_HOSTS_DEFAULT);
-    printf("  --exclude ip[,ip...]           排除逗号分隔的IP列表\n");
-    printf("  -h, --help                     显示此帮助信息\n");
-    printf("  --version                      显示版本信息\n");
+    printf("\n");
+    printf(qping::gettext("扩展选项:\n", "Extended options:\n"));
+    printf(qping::gettext("  --concurrency N                并发线程数\n", "  --concurrency N                Concurrency count\n"));
+    printf(qping::gettext("  --force                        允许扫描大量目标\n", "  --force                        Allow scanning large number of targets\n"));
+    printf(qping::gettext("  --exclude ip[,ip...]           排除IP列表\n", "  --exclude ip[,ip...]           Exclude comma-separated IPs\n"));
+    printf(qping::gettext("  -ZH, --chinese                 切换为中文界面\n", "  -ZH, --chinese                 Switch to Chinese interface\n"));
+    printf(qping::gettext("  -EN, --english                 切换为英文界面\n", "  -EN, --english                 Switch to English interface\n"));
+    printf(qping::gettext("  -h, --help                     显示帮助信息\n", "  -h, --help                     Show help message\n"));
+    printf(qping::gettext("  --version                      显示版本信息\n", "  --version                      Show version information\n"));
 
-    printf("\n域名解析:\n");
-    printf("  - 支持ping域名（如 google.com），自动进行DNS解析\n");
-    printf("  - 使用 -4 强制解析为IPv4地址\n");
-    printf("  - 使用 -6 强制解析为IPv6地址\n");
+    printf("\n");
+    printf(qping::gettext("端口检测选项:\n", "Port scan options:\n"));
+    printf(qping::gettext("  -p ports                       检测端口(单/多/范围)\n", "  -p ports                       Scan ports (single/multiple/range)\n"));
+    printf(qping::gettext("                                  格式: 80, 80,443, 1-1024\n", "                                  Format: 80, 80,443, 1-1024\n"));
 
-    printf("\n示例:\n");
+    printf("\n");
+    printf(qping::gettext("域名解析:\n", "Domain resolution:\n"));
+    printf(qping::gettext("  - 支持ping域名，自动DNS解析\n", "  - Supports ping domain names with auto DNS resolution\n"));
+    printf(qping::gettext("  - 使用-4强制IPv4解析\n", "  - Use -4 to force IPv4 resolution\n"));
+    printf(qping::gettext("  - 使用-6强制IPv6解析\n", "  - Use -6 to force IPv6 resolution\n"));
+
+    printf("\n");
+    printf(qping::gettext("示例:\n", "Examples:\n"));
     printf("  %s 192.168.0.1\n", prog);
     printf("  %s -t 192.168.0.1\n", prog);
     printf("  %s -n 5 -l 64 192.168.0.1\n", prog);
     printf("  %s 192.168.1.1/24\n", prog);
     printf("  %s --concurrency 200 192.168.1.1/24\n", prog);
+    printf("  %s 192.168.0.1 -p 80\n", prog);
+    printf("  %s 192.168.0.1 -p 80,443\n", prog);
+    printf("  %s 192.168.0.1 -p 1-1024\n", prog);
+    printf("  %s 192.168.1.0/24 -p 22,80,443\n", prog);
 }
 
 //=============================================================================
@@ -403,6 +419,11 @@ int main(int argc, char** argv) {
     bool auto_added = auto_add_to_path();
 
     //=========================================================================
+    // 加载语言设置（从注册表）- 必须在任何输出之前执行
+    //=========================================================================
+    qping::load_language_from_registry();
+
+    //=========================================================================
     // 参数检查（快速路径，避免不必要的预热）
     //=========================================================================
     if (argc < 2) {
@@ -445,6 +466,25 @@ int main(int argc, char** argv) {
     // Ping 配置选项
     PingOptions opts;
 
+    // 端口检测配置
+    bool port_mode = false;              ///< 是否为端口检测模式
+    std::vector<int> port_list;          ///< 要检测的端口列表
+    bool using_common_ports = false;     ///< 是否使用默认常用端口
+
+    // 常用端口列表
+    const std::vector<int> common_ports = {21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 993, 995, 1433, 1521, 3306, 3389, 5432, 5900, 6379, 8080, 8443, 9200, 27017};
+
+    /**
+     * @struct ScanTarget
+     * @brief 扫描目标结构体（支持端口检测模式）
+     */
+    struct ScanTarget {
+        std::string ip;      ///< IP 地址
+        int port;           ///< 端口号，-1 表示无端口（纯 ping）
+        ScanTarget(const std::string& i, int p) : ip(i), port(p) {}
+    };
+    std::vector<ScanTarget> scan_targets;  ///< 扫描目标列表
+
     // 排除列表和目标列表
     std::unordered_set<std::string> exclude_set;
     std::vector<std::string> tokens;
@@ -454,6 +494,20 @@ int main(int argc, char** argv) {
     //=========================================================================
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
+
+        //---------------------------------------------------------------------
+        // 语言切换选项
+        //---------------------------------------------------------------------
+        if (arg == "-ZH" || arg == "--chinese") {
+            qping::set_language(Language::CHINESE);
+            printf("语言已切换为中文\n");
+            return 0;
+        }
+        if (arg == "-EN" || arg == "--english") {
+            qping::set_language(Language::ENGLISH);
+            printf("Language switched to English\n");
+            return 0;
+        }
 
         //---------------------------------------------------------------------
         // 帮助和版本选项
@@ -620,6 +674,38 @@ int main(int argc, char** argv) {
         }
 
         //---------------------------------------------------------------------
+        // 端口检测选项
+        //---------------------------------------------------------------------
+        if (arg == "-p" || arg == "-P") {
+            port_mode = true;
+            // 检查是否有端口参数
+            if (i + 1 < argc) {
+                std::string next_arg = argv[i + 1];
+                // 如果下一个参数不是以 - 开头，则认为是端口参数
+                if (next_arg.empty() || next_arg[0] != '-') {
+                    std::string port_str = argv[++i];
+                    if (!parse_port_range(port_str, port_list)) {
+                        fprintf(stderr, "无效的端口格式: %s\n", port_str.c_str());
+                        return 2;
+                    }
+                    if (port_list.empty()) {
+                        fprintf(stderr, "端口列表为空\n");
+                        return 2;
+                    }
+                } else {
+                    // -p 后面没有端口参数，扫描常用端口
+                    port_list = common_ports;
+                    using_common_ports = true;
+                }
+            } else {
+                // -p 是最后一个参数，扫描常用端口
+                port_list = common_ports;
+                using_common_ports = true;
+            }
+            continue;
+        }
+
+        //---------------------------------------------------------------------
         // 目标参数处理
         // 支持三种逗号用法：
         // 1. 多个独立目标：192.168.1.1,192.168.2.1（每部分都是完整IP或域名）
@@ -735,13 +821,13 @@ int main(int argc, char** argv) {
                 // 解析所有地址
                 resolved_ips = resolve_to_ips(tok, false);
             }
-            
+
             if (resolved_ips.empty()) {
                 fprintf(stderr, "无法解析域名: %s\n", tok.c_str());
                 WSACleanup();
                 return 2;
             }
-            
+
             // 添加解析到的IP地址
             for (auto& ip : resolved_ips) {
                 if (exclude_set.find(ip) == exclude_set.end()) {
@@ -764,22 +850,42 @@ int main(int argc, char** argv) {
         }
     }
 
+    //=========================================================================
+    // 构建扫描目标列表（支持端口检测模式）
+    //=========================================================================
+    for (const auto& ip : all_targets) {
+        if (port_mode) {
+            for (int port : port_list) {
+                scan_targets.emplace_back(ip, port);
+            }
+        } else {
+            scan_targets.emplace_back(ip, -1);
+        }
+    }
+
     // 检查是否有有效目标
-    if (all_targets.empty()) {
+    if (scan_targets.empty()) {
         fprintf(stderr, "未生成任何目标\n");
         WSACleanup();
         return 2;
     }
 
     // 检查目标数量限制
-    if (!force && all_targets.size() > MAX_HOSTS_DEFAULT) {
-        fprintf(stderr, "目标数量(%zu)超过限制。使用 --force 覆盖\n", all_targets.size());
+    if (!force && scan_targets.size() > MAX_HOSTS_DEFAULT) {
+        fprintf(stderr, "目标数量(%zu)超过限制。使用 --force 覆盖\n", scan_targets.size());
         WSACleanup();
         return 2;
     }
 
-    printf("总目标数: %zu\n", all_targets.size());
-    size_t N = all_targets.size();
+    printf(qping::gettext("总目标数: %zu\n", "Total targets: %zu\n"), scan_targets.size());
+    if (port_mode) {
+        if (using_common_ports) {
+            printf(qping::gettext("端口检测模式: 常用端口 (21个)\n", "Port scan mode: common ports (21)\n"));
+        } else {
+            printf(qping::gettext("端口检测模式: %zu 个端口\n", "Port scan mode: %zu ports\n"), port_list.size());
+        }
+    }
+    size_t N = scan_targets.size();
 
     //=========================================================================
     // 初始化统计数据
@@ -859,74 +965,108 @@ int main(int argc, char** argv) {
                 }
 
                 //---------------------------------------------------------
-                // 执行 Ping 操作
+                // 执行操作（Ping 或端口检测）
                 //---------------------------------------------------------
-                const std::string& target = all_targets[idx];
+                const ScanTarget& scan_target = scan_targets[idx];
+                const std::string& target = scan_target.ip;
                 int af = get_address_family(target);
-                PingResult result;
 
-                if (af == AF_INET && !force_ipv6) {
-                    // IPv4 Ping
-                    result = ping_ipv4(target, opts);
-                } else if (af == AF_INET6 && !force_ipv4) {
-                    // IPv6 Ping
-                    result = ping_ipv6(target, opts);
-                }
+                if (port_mode) {
+                    //---------------------------------------------------------
+                    // 端口检测模式
+                    //---------------------------------------------------------
+                    PortResult port_result = scan_tcp_port(target, scan_target.port, DEFAULT_PORT_TIMEOUT_MS);
 
-                // 更新接收计数
-                if (result.success) {
-                    stats[idx].recv.fetch_add(1);
-                }
+                    if (port_result.open) {
+                        stats[idx].recv.fetch_add(1);
+                    }
 
-                //---------------------------------------------------------
-                // 输出结果
-                //---------------------------------------------------------
-                {
-                    std::lock_guard<std::mutex> lk(print_mtx);
+                    {
+                        std::lock_guard<std::mutex> lk(print_mtx);
 
-                    // 可选：解析主机名
-                    std::string hostname;
-                    if (resolve_names) {
-                        hostname = resolve_hostname(target, af);
+                        std::string hostname;
+                        if (resolve_names) {
+                            hostname = resolve_hostname(target, af);
+                        }
+
+                        if (port_result.open) {
+                            if (!hostname.empty()) {
+                                printf("%s:%d [%s] 开放 (%s) 时间=%lums\n",
+                                       hostname.c_str(), scan_target.port, target.c_str(),
+                                       port_result.service.c_str(), (unsigned long)port_result.rtt_ms);
+                            } else {
+                                printf("%s:%d 开放 (%s) 时间=%lums\n",
+                                       target.c_str(), scan_target.port,
+                                       port_result.service.c_str(), (unsigned long)port_result.rtt_ms);
+                            }
+                        }
+                    }
+                } else {
+                    //---------------------------------------------------------
+                    // Ping 模式
+                    //---------------------------------------------------------
+                    PingResult result;
+
+                    if (af == AF_INET && !force_ipv6) {
+                        result = ping_ipv4(target, opts);
+                    } else if (af == AF_INET6 && !force_ipv4) {
+                        result = ping_ipv6(target, opts);
                     }
 
                     if (result.success) {
-                        // 成功回复
-                        if (!hostname.empty()) {
-                            printf("来自 %s [%s] 的回复: 字节=%d 时间=%lums TTL=%lu\n",
-                                   hostname.c_str(), target.c_str(), opts.payload_size,
-                                   (unsigned long)result.rtt_ms, (unsigned long)result.reply_ttl);
-                        } else {
-                            printf("来自 %s 的回复: 字节=%d 时间=%lums TTL=%lu\n",
-                                   target.c_str(), opts.payload_size,
-                                   (unsigned long)result.rtt_ms, (unsigned long)result.reply_ttl);
+                        stats[idx].recv.fetch_add(1);
+                    }
+
+                    //---------------------------------------------------------
+                    // 输出结果
+                    //---------------------------------------------------------
+                    {
+                        std::lock_guard<std::mutex> lk(print_mtx);
+
+                        // 可选：解析主机名
+                        std::string hostname;
+                        if (resolve_names) {
+                            hostname = resolve_hostname(target, af);
                         }
 
-                        // 输出记录路由信息
-                        if (!result.route_hops.empty()) {
-                            printf("    路由: ");
-                            for (size_t i = 0; i < result.route_hops.size(); ++i) {
-                                if (i > 0) printf(" -> ");
-                                printf("%s", result.route_hops[i].c_str());
+                        if (result.success) {
+                            // 成功回复
+                            if (!hostname.empty()) {
+                                printf("来自 %s [%s] 的回复: 字节=%d 时间=%lums TTL=%lu\n",
+                                       hostname.c_str(), target.c_str(), opts.payload_size,
+                                       (unsigned long)result.rtt_ms, (unsigned long)result.reply_ttl);
+                            } else {
+                                printf("来自 %s 的回复: 字节=%d 时间=%lums TTL=%lu\n",
+                                       target.c_str(), opts.payload_size,
+                                       (unsigned long)result.rtt_ms, (unsigned long)result.reply_ttl);
                             }
-                            printf("\n");
-                        }
 
-                        // 输出时间戳信息
-                        if (!result.timestamps.empty()) {
-                            printf("    时间戳: ");
-                            for (size_t i = 0; i < result.timestamps.size(); ++i) {
-                                if (i > 0) printf(", ");
-                                printf("%ums", result.timestamps[i]);
+                            // 输出记录路由信息
+                            if (!result.route_hops.empty()) {
+                                printf("    路由: ");
+                                for (size_t i = 0; i < result.route_hops.size(); ++i) {
+                                    if (i > 0) printf(" -> ");
+                                    printf("%s", result.route_hops[i].c_str());
+                                }
+                                printf("\n");
                             }
-                            printf("\n");
-                        }
-                    } else {
-                        // 请求超时
-                        if (!hostname.empty()) {
-                            printf("请求超时 %s [%s]\n", hostname.c_str(), target.c_str());
+
+                            // 输出时间戳信息
+                            if (!result.timestamps.empty()) {
+                                printf("    时间戳: ");
+                                for (size_t i = 0; i < result.timestamps.size(); ++i) {
+                                    if (i > 0) printf(", ");
+                                    printf("%ums", result.timestamps[i]);
+                                }
+                                printf("\n");
+                            }
                         } else {
-                            printf("请求超时 %s\n", target.c_str());
+                            // 请求超时
+                            if (!hostname.empty()) {
+                                printf("请求超时 %s [%s]\n", hostname.c_str(), target.c_str());
+                            } else {
+                                printf("请求超时 %s\n", target.c_str());
+                            }
                         }
                     }
                 }
@@ -988,31 +1128,59 @@ int main(int argc, char** argv) {
     //=========================================================================
     // 输出最终统计信息
     //=========================================================================
-    printf("\n--- 统计信息 ---\n");
+    printf(qping::gettext("\n--- 统计信息 ---\n", "\n--- Statistics ---\n"));
 
     uint64_t total_sent = 0, total_recv = 0;
-    std::vector<std::string> online_ips;   // 在线设备列表
-    std::vector<std::string> failed_ips;   // 失败设备列表
+    std::vector<std::string> online_ips;   // online devices
+    std::vector<std::string> failed_ips;   // failed devices
 
     // 收集统计数据并分类设备
     for (size_t i = 0; i < N; ++i) {
         uint64_t s = stats[i].sent.load();
         uint64_t r = stats[i].recv.load();
         uint64_t lost = (s > r) ? (s - r) : 0;
-        double pct = (s > 0) ? (100.0 * lost / s) : 0.0;
 
-        printf("%s : 已发送=%llu, 已接收=%llu, 丢失=%llu (%.1f%%)\n",
-               all_targets[i].c_str(), (unsigned long long)s,
-               (unsigned long long)r, (unsigned long long)lost, pct);
+        const ScanTarget& st = scan_targets[i];
 
         total_sent += s;
         total_recv += r;
 
         // 分类：至少收到一个回复为在线，否则为失败
         if (r > 0) {
-            online_ips.push_back(all_targets[i]);
+            if (port_mode) {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%s:%d", st.ip.c_str(), st.port);
+                online_ips.push_back(buf);
+            } else {
+                online_ips.push_back(st.ip);
+            }
         } else {
-            failed_ips.push_back(all_targets[i]);
+            if (port_mode) {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%s:%d", st.ip.c_str(), st.port);
+                failed_ips.push_back(buf);
+            } else {
+                failed_ips.push_back(st.ip);
+            }
+        }
+    }
+
+    // Ping mode: output detailed statistics for each target
+    if (!port_mode) {
+        for (size_t i = 0; i < N; ++i) {
+            uint64_t s = stats[i].sent.load();
+            uint64_t r = stats[i].recv.load();
+            uint64_t lost = (s > r) ? (s - r) : 0;
+            double pct = (s > 0) ? (100.0 * lost / s) : 0.0;
+            const ScanTarget& st = scan_targets[i];
+            printf("%s : %s=%llu, %s=%llu, %s=%llu (%.1f%%)\n",
+                   st.ip.c_str(),
+                   qping::gettext("已发送", "Sent"),
+                   (unsigned long long)s,
+                   qping::gettext("已接收", "Received"),
+                   (unsigned long long)r,
+                   qping::gettext("丢失", "Lost"),
+                   (unsigned long long)lost, pct);
         }
     }
 
@@ -1020,15 +1188,60 @@ int main(int argc, char** argv) {
     uint64_t total_lost = (total_sent > total_recv) ? (total_sent - total_recv) : 0;
     double total_pct = (total_sent > 0) ? (100.0 * total_lost / total_sent) : 0.0;
 
-    printf("\n数据包统计: 发送=%llu, 接收=%llu, 丢失=%llu (%.1f%%)\n",
-           (unsigned long long)total_sent, (unsigned long long)total_recv,
-           (unsigned long long)total_lost, total_pct);
+    printf("\n");
+    printf("┌─────────────────────────────────────────────────────────────\n");
+    printf(qping::gettext("│                    统计信息\n", "│                    Statistics\n"));
+    printf("└─────────────────────────────────────────────────────────────\n");
 
-    // 输出在线/失败设备列表（使用范围压缩格式）
-    printf("\n在线设备 (%zu): %s\n",
-           online_ips.size(), compress_ip_ranges(online_ips).c_str());
-    printf("失败设备 (%zu): %s\n",
-           failed_ips.size(), compress_ip_ranges(failed_ips).c_str());
+    if (port_mode) {
+        printf(qping::gettext("端口统计: 扫描=%llu, 开放=%llu, 关闭=%llu (%.1f%%)\n",
+                              "Port Stats: Scanned=%llu, Open=%llu, Closed=%llu (%.1f%%)\n"),
+               (unsigned long long)total_sent, (unsigned long long)total_recv,
+               (unsigned long long)total_lost, total_pct);
+    } else {
+        printf(qping::gettext("数据包统计: 发送=%llu, 接收=%llu, 丢失=%llu (%.1f%%)\n",
+                              "Packet Stats: Sent=%llu, Received=%llu, Lost=%llu (%.1f%%)\n"),
+               (unsigned long long)total_sent, (unsigned long long)total_recv,
+               (unsigned long long)total_lost, total_pct);
+    }
+
+    // Output online/failed devices list
+    if (port_mode) {
+        printf("\n");
+        printf("┌─────────────────────────────────────────────────────────────\n");
+        printf(qping::gettext("│                    检测结果\n", "│                    Results\n"));
+        printf("└─────────────────────────────────────────────────────────────\n");
+        
+        if (!online_ips.empty()) {
+            printf(qping::gettext("开放端口 (%zu):\n", "Open ports (%zu):\n"), online_ips.size());
+            for (size_t i = 0; i < online_ips.size(); ++i) {
+                printf("  [+] %s\n", online_ips[i].c_str());
+            }
+        } else {
+            printf(qping::gettext("开放端口 (0): 未发现开放端口\n", "Open ports (0): No open ports found\n"));
+        }
+        
+        if (!failed_ips.empty()) {
+            printf("\n");
+            printf(qping::gettext("关闭端口 (%zu):\n", "Closed ports (%zu):\n"), failed_ips.size());
+            for (size_t i = 0; i < failed_ips.size() && i < 20; ++i) {
+                printf("  [-] %s\n", failed_ips[i].c_str());
+            }
+            if (failed_ips.size() > 20) {
+                printf(qping::gettext("  ... (还有 %zu 个)\n", "  ... (%zu more)\n"), failed_ips.size() - 20);
+            }
+        }
+    } else {
+        printf("\n");
+        printf("┌─────────────────────────────────────────────────────────────\n");
+        printf(qping::gettext("│                    检测结果\n", "│                    Results\n"));
+        printf("└─────────────────────────────────────────────────────────────\n");
+        
+        printf(qping::gettext("在线设备 (%zu): %s\n", "Online devices (%zu): %s\n"),
+               online_ips.size(), compress_ip_ranges(online_ips).c_str());
+        printf(qping::gettext("失败设备 (%zu): %s\n", "Failed devices (%zu): %s\n"),
+               failed_ips.size(), compress_ip_ranges(failed_ips).c_str());
+    }
 
     //=========================================================================
     // 清理并退出

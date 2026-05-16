@@ -731,7 +731,13 @@ bool is_possible_hostname(const std::string& s) {
     //-------------------------------------------------------------------------
     // 启发式判断是否为可能的主机名
     //-------------------------------------------------------------------------
-    
+
+    // 0. 检查是否像命令行选项（以 - 开头后跟字母，如 -p, -h）
+    if (s.size() >= 2 && s[0] == '-' &&
+        ((s[1] >= 'a' && s[1] <= 'z') || (s[1] >= 'A' && s[1] <= 'Z'))) {
+        return false;  // 看起来像选项，不是主机名
+    }
+
     // 1. 检查是否包含字母（主机名通常包含字母）
     bool has_letter = false;
     for (char c : s) {
@@ -795,9 +801,340 @@ bool is_possible_hostname(const std::string& s) {
     if (s == "localhost" || s == "LOCALHOST") {
         return true;
     }
-    
+
     // 不符合任何主机名特征
     return false;
+}
+
+//=============================================================================
+// 端口检测实现
+//=============================================================================
+
+std::string get_service_name(int port) {
+    static const std::unordered_map<int, const char*> services = {
+        {20, "FTP-DATA"}, {21, "FTP"}, {22, "SSH"}, {23, "TELNET"},
+        {25, "SMTP"}, {53, "DNS"}, {80, "HTTP"}, {110, "POP3"},
+        {143, "IMAP"}, {443, "HTTPS"}, {445, "SMB"}, {465, "SMTPS"},
+        {587, "SUBMISSION"}, {993, "IMAPS"}, {995, "POP3S"},
+        {1433, "MSSQL"}, {1521, "ORACLE"}, {3306, "MYSQL"}, {3389, "RDP"},
+        {5432, "POSTGRESQL"}, {5900, "VNC"}, {6379, "REDIS"}, {8080, "HTTP-ALT"},
+        {8443, "HTTPS-ALT"}, {27017, "MONGODB"}
+    };
+
+    auto it = services.find(port);
+    return (it != services.end()) ? std::string(it->second) : "";
+}
+
+PortResult scan_tcp_port(const std::string& ip, int port, int timeout_ms) {
+    PortResult result;
+    result.port = port;
+
+    int af = get_address_family(ip);
+    bool is_ipv6 = (af == AF_INET6);
+
+    SOCKET sock = INVALID_SOCKET;
+    auto start_time = std::chrono::steady_clock::now();
+
+    if (is_ipv6) {
+        sock = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
+    } else {
+        sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    }
+
+    if (sock == INVALID_SOCKET) {
+        return result;
+    }
+
+    DWORD nonblocking = 1;
+    ioctlsocket(sock, FIONBIO, &nonblocking);
+
+    int ret;
+    if (is_ipv6) {
+        sockaddr_in6 addr = {};
+        addr.sin6_family = AF_INET6;
+        addr.sin6_port = htons((USHORT)port);
+        InetPtonA(AF_INET6, ip.c_str(), &addr.sin6_addr);
+        ret = connect(sock, (sockaddr*)&addr, sizeof(addr));
+    } else {
+        sockaddr_in addr = {};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons((USHORT)port);
+        InetPtonA(AF_INET, ip.c_str(), &addr.sin_addr);
+        ret = connect(sock, (sockaddr*)&addr, sizeof(addr));
+    }
+
+    if (ret == 0) {
+        result.open = true;
+        auto end_time = std::chrono::steady_clock::now();
+        result.rtt_ms = (DWORD)std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        result.service = get_service_name(port);
+        closesocket(sock);
+        return result;
+    }
+
+    fd_set write_fds;
+    FD_ZERO(&write_fds);
+    FD_SET(sock, &write_fds);
+
+    TIMEVAL tv = {};
+    tv.tv_sec = timeout_ms / 1000;
+    tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+    ret = select(0, nullptr, &write_fds, nullptr, &tv);
+
+    if (ret > 0 && FD_ISSET(sock, &write_fds)) {
+        int so_error = 0;
+        socklen_t len = sizeof(so_error);
+        getsockopt(sock, SOL_SOCKET, SO_ERROR, (char*)&so_error, &len);
+
+        if (so_error == 0) {
+            result.open = true;
+            auto end_time = std::chrono::steady_clock::now();
+            result.rtt_ms = (DWORD)std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+            result.service = get_service_name(port);
+        }
+    }
+
+    closesocket(sock);
+    return result;
+}
+
+bool has_port(const std::string& target) {
+    size_t colon_count = 0;
+    size_t last_colon = 0;
+
+    for (size_t i = 0; i < target.size(); ++i) {
+        if (target[i] == ':') {
+            colon_count++;
+            last_colon = i;
+        }
+    }
+
+    if (colon_count != 1) {
+        return false;
+    }
+
+    std::string ip_part = target.substr(0, last_colon);
+    std::string port_part = target.substr(last_colon + 1);
+
+    if (ip_part.empty() || port_part.empty()) {
+        return false;
+    }
+
+    if (ip_part.find(':') != std::string::npos) {
+        return false;
+    }
+
+    return is_valid_port_format(port_part);
+}
+
+void split_host_port(const std::string& target, std::string& ip, int& port) {
+    ip = target;
+    port = -1;
+
+    size_t colon_pos = target.find_last_of(':');
+    if (colon_pos == std::string::npos) {
+        return;
+    }
+
+    std::string ip_part = target.substr(0, colon_pos);
+    std::string port_part = target.substr(colon_pos + 1);
+
+    if (ip_part.empty() || port_part.empty()) {
+        return;
+    }
+
+    if (ip_part.find(':') != std::string::npos) {
+        size_t first_colon = ip_part.find(':');
+        size_t second_colon = ip_part.find_last_of(':');
+
+        if (first_colon != second_colon) {
+            return;
+        }
+        ip = "[" + ip_part + "]";
+    } else {
+        ip = ip_part;
+    }
+
+    if (is_valid_port_format(port_part)) {
+        size_t dash_pos = port_part.find('-');
+        size_t comma_pos = port_part.find(',');
+
+        if (dash_pos == std::string::npos && comma_pos == std::string::npos) {
+            int p;
+            if (parse_int(port_part.c_str(), p)) {
+                port = p;
+            }
+        }
+    }
+}
+
+bool is_valid_port_format(const std::string& s) {
+    if (s.empty()) {
+        return false;
+    }
+
+    for (char c : s) {
+        if (c != '-' && c != ',' && (c < '0' || c > '9')) {
+            return false;
+        }
+    }
+
+    std::vector<std::string> parts;
+    if (s.find(',') != std::string::npos) {
+        parts = split(s, ',');
+    } else {
+        parts.push_back(s);
+    }
+
+    for (const auto& part : parts) {
+        if (part.empty()) {
+            return false;
+        }
+
+        size_t dash_pos = part.find('-');
+        if (dash_pos != std::string::npos) {
+            std::string left = part.substr(0, dash_pos);
+            std::string right = part.substr(dash_pos + 1);
+            int p1, p2;
+
+            if (!parse_int(left.c_str(), p1) || !parse_int(right.c_str(), p2)) {
+                return false;
+            }
+            if (p1 < 1 || p1 > 65535 || p2 < 1 || p2 > 65535 || p1 > p2) {
+                return false;
+            }
+        } else {
+            int p;
+            if (!parse_int(part.c_str(), p)) {
+                return false;
+            }
+            if (p < 1 || p > 65535) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool parse_port_range(const std::string& port_str, std::vector<int>& ports) {
+    ports.clear();
+
+    std::vector<std::string> parts;
+    if (port_str.find(',') != std::string::npos) {
+        parts = split(port_str, ',');
+    } else {
+        parts.push_back(port_str);
+    }
+
+    for (const auto& part : parts) {
+        if (part.empty()) {
+            continue;
+        }
+
+        size_t dash_pos = part.find('-');
+        if (dash_pos != std::string::npos) {
+            std::string left = part.substr(0, dash_pos);
+            std::string right = part.substr(dash_pos + 1);
+            int p1, p2;
+
+            if (!parse_int(left.c_str(), p1) || !parse_int(right.c_str(), p2)) {
+                return false;
+            }
+            if (p1 < 1 || p1 > 65535 || p2 < 1 || p2 > 65535 || p1 > p2) {
+                return false;
+            }
+
+            for (int p = p1; p <= p2; ++p) {
+                ports.push_back(p);
+            }
+        } else {
+            int p;
+            if (!parse_int(part.c_str(), p)) {
+                return false;
+            }
+            if (p < 1 || p > 65535) {
+                return false;
+            }
+            ports.push_back(p);
+        }
+    }
+
+    return !ports.empty();
+}
+
+//=============================================================================
+// 语言设置函数
+//=============================================================================
+
+Language g_language = Language::AUTO;
+
+void load_language_from_registry() {
+    HKEY hKey;
+    LONG result = RegOpenKeyExW(HKEY_CURRENT_USER, 
+        L"Software\\qping", 0, KEY_READ, &hKey);
+    
+    if (result == ERROR_SUCCESS) {
+        DWORD lang_value = 0;
+        DWORD cbData = sizeof(DWORD);
+        result = RegQueryValueExW(hKey, L"Language", NULL, NULL, 
+            (LPBYTE)&lang_value, &cbData);
+        
+        if (result == ERROR_SUCCESS) {
+            switch (lang_value) {
+                case 1:
+                    g_language = Language::CHINESE;
+                    break;
+                case 2:
+                    g_language = Language::ENGLISH;
+                    break;
+                default:
+                    g_language = Language::AUTO;
+            }
+        }
+        RegCloseKey(hKey);
+    }
+}
+
+void save_language_to_registry(Language lang) {
+    HKEY hKey;
+    LONG result = RegCreateKeyExW(HKEY_CURRENT_USER, 
+        L"Software\\qping", 0, NULL, REG_OPTION_NON_VOLATILE,
+        KEY_WRITE, NULL, &hKey, NULL);
+    
+    if (result == ERROR_SUCCESS) {
+        DWORD lang_value = 0;
+        switch (lang) {
+            case Language::CHINESE:
+                lang_value = 1;
+                break;
+            case Language::ENGLISH:
+                lang_value = 2;
+                break;
+            default:
+                lang_value = 0;
+        }
+        RegSetValueExW(hKey, L"Language", 0, REG_DWORD, 
+            (const BYTE*)&lang_value, sizeof(DWORD));
+        RegCloseKey(hKey);
+    }
+}
+
+void set_language(Language lang) {
+    g_language = lang;
+    save_language_to_registry(lang);
+}
+
+Language get_language() {
+    return g_language;
+}
+
+const char* gettext(const char* zh, const char* en) {
+    if (g_language == Language::ENGLISH) {
+        return en;
+    }
+    return zh;
 }
 
 } // namespace qping
