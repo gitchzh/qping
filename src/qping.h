@@ -2,7 +2,7 @@
  * @file qping.h
  * @brief qping 公共头文件 - 常量定义、数据结构和函数声明
  * @author mrchzh <gmrchzh@gmail.com>
- * @version 1.2.0
+ * @version 1.4.0
  * @date 2026
  * @copyright MIT License
  *
@@ -84,7 +84,7 @@ namespace qping {
 //=============================================================================
 
 /** @brief 程序版本号 */
-constexpr const char* VERSION = "1.2.0";
+constexpr const char* VERSION = "1.4.0";
 
 //=============================================================================
 // 默认参数常量

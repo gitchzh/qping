@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 project(qping
-    VERSION 1.2.0
+    VERSION 1.4.0
     DESCRIPTION "Windows Ping 替代工具，支持高级扫描功能"
     LANGUAGES CXX
 )
